@@ -1,0 +1,92 @@
+specVersion: 0.0.1
+schema:
+  file: ./schema.graphql
+dataSources:
+  - kind: ethereum/contract
+    name: QuantstampAudit
+    network: mainnet
+    source:
+      address: "0x5a0e27020FA22AdaB2e81495025bEF3Fab7821fd"
+      abi: QuantstampAudit
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.2
+      language: wasm/assemblyscript
+      entities:
+        - LogAuditFinished
+        - LogPoliceAuditFinished
+        - LogAuditRequested
+        - LogAuditAssigned
+        - LogReportSubmissionError_InvalidAuditor
+        - LogReportSubmissionError_InvalidState
+        - LogReportSubmissionError_InvalidResult
+        - LogReportSubmissionError_ExpiredAudit
+        - LogAuditAssignmentError_ExceededMaxAssignedRequests
+        - LogAuditAssignmentError_Understaked
+        - LogAuditAssignmentUpdate_Expired
+        - LogClaimRewardsReachedGasLimit
+        - LogAuditQueueIsEmpty
+        - LogPayAuditor
+        - LogAuditNodePriceChanged
+        - LogRefund
+        - LogRefundInvalidRequestor
+        - LogRefundInvalidState
+        - LogRefundInvalidFundsLocked
+        - LogAuditNodePriceHigherThanRequests
+        - Pause
+        - Unpause
+        - OwnershipRenounced
+        - OwnershipTransferred
+      abis:
+        - name: QuantstampAudit
+          file: ./abis/QuantstampAudit.json
+      eventHandlers:
+        - event: LogAuditFinished(uint256,address,uint8,bytes)
+          handler: handleLogAuditFinished
+        - event: LogPoliceAuditFinished(uint256,address,bytes,bool)
+          handler: handleLogPoliceAuditFinished
+        - event: LogAuditRequested(uint256,address,string,uint256)
+          handler: handleLogAuditRequested
+        - event: LogAuditAssigned(uint256,address,address,string,uint256,uint256)
+          handler: handleLogAuditAssigned
+        - event: LogReportSubmissionError_InvalidAuditor(uint256,address)
+          handler: handleLogReportSubmissionError_InvalidAuditor
+        - event: LogReportSubmissionError_InvalidState(uint256,address,uint8)
+          handler: handleLogReportSubmissionError_InvalidState
+        - event: LogReportSubmissionError_InvalidResult(uint256,address,uint8)
+          handler: handleLogReportSubmissionError_InvalidResult
+        - event: LogReportSubmissionError_ExpiredAudit(uint256,address,uint256)
+          handler: handleLogReportSubmissionError_ExpiredAudit
+        - event: LogAuditAssignmentError_ExceededMaxAssignedRequests(address)
+          handler: handleLogAuditAssignmentError_ExceededMaxAssignedRequests
+        - event: LogAuditAssignmentError_Understaked(address,uint256)
+          handler: handleLogAuditAssignmentError_Understaked
+        - event: LogAuditAssignmentUpdate_Expired(uint256,uint256)
+          handler: handleLogAuditAssignmentUpdate_Expired
+        - event: LogClaimRewardsReachedGasLimit(address)
+          handler: handleLogClaimRewardsReachedGasLimit
+        - event: LogAuditQueueIsEmpty()
+          handler: handleLogAuditQueueIsEmpty
+        - event: LogPayAuditor(uint256,address,uint256)
+          handler: handleLogPayAuditor
+        - event: LogAuditNodePriceChanged(address,uint256)
+          handler: handleLogAuditNodePriceChanged
+        - event: LogRefund(uint256,address,uint256)
+          handler: handleLogRefund
+        - event: LogRefundInvalidRequestor(uint256,address)
+          handler: handleLogRefundInvalidRequestor
+        - event: LogRefundInvalidState(uint256,uint8)
+          handler: handleLogRefundInvalidState
+        - event: LogRefundInvalidFundsLocked(uint256,uint256,uint256)
+          handler: handleLogRefundInvalidFundsLocked
+        - event: LogAuditNodePriceHigherThanRequests(address,uint256)
+          handler: handleLogAuditNodePriceHigherThanRequests
+        - event: Pause()
+          handler: handlePause
+        - event: Unpause()
+          handler: handleUnpause
+        - event: OwnershipRenounced(indexed address)
+          handler: handleOwnershipRenounced
+        - event: OwnershipTransferred(indexed address,indexed address)
+          handler: handleOwnershipTransferred
+      file: ./src/mapping.ts
