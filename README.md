@@ -10,7 +10,7 @@ This subgraph dynamically provides info about smart contract Audits on this plat
 
 **Dapp**: _https://protocol.quantstamp.com/_
 
-**Analytics Page**: __
+**Analytics Page**: _https://andrejrakic.github.io/quantstamp-analytics/_
 
 ## Example Queries
 
