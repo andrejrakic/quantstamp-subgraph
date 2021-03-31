@@ -26,119 +26,178 @@ import {
   OwnershipRenounced,
   OwnershipTransferred
 } from "../generated/QuantstampAudit/QuantstampAudit"
-import { ExampleEntity } from "../generated/schema"
+import { 
+  Report, 
+  Audit, 
+  SmartContract, 
+  AuditNode, 
+  PoliceNode, 
+  Refund,
+  LogReportSubmissionError_InvalidAuditorEntity, 
+  LogReportSubmissionError_InvalidStateEntity,
+  LogReportSubmissionError_InvalidResultEntity,
+  LogReportSubmissionError_ExpiredAuditEntity,
+  LogAuditAssignmentError_UnderstakedEntity,
+  LogAuditAssignmentUpdate_ExpiredEntity,
+  LogRefund_InvalidRequestor,
+  LogRefund_InvalidState,
+  LogRefund_InvalidFundsLocked
+} from "../generated/schema"
 
-export function handleLogAuditFinished(event: LogAuditFinished): void {
-  // Entities can be loaded from the store using a string ID; this ID
-  // needs to be unique across all entities of the same type
-  let entity = ExampleEntity.load(event.transaction.from.toHex())
-
-  // Entities only exist after they have been saved to the store;
-  // `null` checks allow to create entities on demand
-  if (entity == null) {
-    entity = new ExampleEntity(event.transaction.from.toHex())
-
-    // Entity fields can be set using simple assignments
-    entity.count = BigInt.fromI32(0)
-  }
-
-  // BigInt and BigDecimal math are supported
-  entity.count = entity.count + BigInt.fromI32(1)
-
-  // Entity fields can be set based on event parameters
-  entity.requestId = event.params.requestId
-  entity.auditor = event.params.auditor
-
-  // Entities can be written to the store with `.save()`
-  entity.save()
-
-  // Note: If a handler doesn't require existing field values, it is faster
-  // _not_ to load the entity from the store. Instead, create it fresh with
-  // `new Entity(...)`, set the fields that should be updated and save the
-  // entity back to the store. Fields that were not set or unset remain
-  // unchanged, allowing for partial updates to be applied.
-
-  // It is also possible to access smart contracts from mappings. For
-  // example, the contract that has emitted the event can be connected to
-  // with:
-  //
-  // let contract = Contract.bind(event.address)
-  //
-  // The following functions can then be called on this contract to access
-  // state variables and other data:
-  //
-  // - contract.reportData(...)
-  // - contract.isAuditFinished(...)
-  // - contract.requestAudit(...)
-  // - contract.refund(...)
-  // - contract.getNextAuditByPrice(...)
-  // - contract.unstake(...)
-  // - contract.myMostRecentAssignedAudit(...)
-  // - contract.mostRecentAssignedRequestIdsPerAuditor(...)
-  // - contract.submitPoliceReport(...)
-  // - contract.claimRewards(...)
-  // - contract.requestAuditWithPriceHint(...)
-  // - contract.totalStakedFor(...)
-  // - contract.getReport(...)
-  // - contract.getNextAvailableReward(...)
-  // - contract.getNextAssignedRequest(...)
-  // - contract.getMinAuditPriceLowerCap(...)
-  // - contract.paused(...)
-  // - contract.auditData(...)
-  // - contract.anyRequestAvailable(...)
-  // - contract.hasEnoughStake(...)
-  // - contract.getMaxAssignedRequests(...)
-  // - contract.getAuditTimeoutInBlocks(...)
-  // - contract.owner(...)
-  // - contract.getNextPrice(...)
-  // - contract.getMinAuditStake(...)
-  // - contract.hasAvailableRewards(...)
-  // - contract.stake(...)
-  // - contract.tokenEscrow(...)
-  // - contract.claimReward(...)
-  // - contract.police(...)
-  // - contract.assignedRequestCount(...)
-  // - contract.findPrecedingPrice(...)
-  // - contract.isPoliceNode(...)
-  // - contract.getNextPoliceAssignment(...)
-  // - contract.getMinAuditPrice(...)
+enum AuditState {
+  None,
+  Queued,
+  Assigned,
+  Refunded,
+  Completed,  // automated audit finished successfully and the report is available
+  Error,      // automated audit failed to finish; the report contains detailed information about the error
+  Expired,
+  Resolved
 }
 
-export function handleLogPoliceAuditFinished(
-  event: LogPoliceAuditFinished
-): void {}
+export function handleLogAuditRequested(event: LogAuditRequested): void {
+  let auditEntity = new Audit(event.params.requestId.toHex());
 
-export function handleLogAuditRequested(event: LogAuditRequested): void {}
+  let smartContractEntity = new SmartContract(event.params.uri);
+  smartContractEntity.save();
 
-export function handleLogAuditAssigned(event: LogAuditAssigned): void {}
+  auditEntity.requestor = event.params.requestor;
+  auditEntity.price = event.params.price;
+  auditEntity.contract = smartContractEntity.id;
+  auditEntity.isVerified = false;
+  auditEntity.auditState = AuditState.Queued;
+  auditEntity.requestTimestamp = event.block.timestamp;
 
-export function handleLogReportSubmissionError_InvalidAuditor(
-  event: LogReportSubmissionError_InvalidAuditor
-): void {}
+  auditEntity.save();
+}
 
-export function handleLogReportSubmissionError_InvalidState(
-  event: LogReportSubmissionError_InvalidState
-): void {}
+export function handleLogAuditAssigned(event: LogAuditAssigned): void {
+  let auditEntity = Audit.load(event.params.requestId.toHex());
+  let auditNodeEntity = AuditNode.load(event.params.auditor.toHex());
 
-export function handleLogReportSubmissionError_InvalidResult(
-  event: LogReportSubmissionError_InvalidResult
-): void {}
+  if(auditNodeEntity == null) {
+    auditNodeEntity = new AuditNode(event.params.auditor.toHex());
+    auditNodeEntity.save();
+  }
 
-export function handleLogReportSubmissionError_ExpiredAudit(
-  event: LogReportSubmissionError_ExpiredAudit
-): void {}
+  auditEntity.auditor = auditNodeEntity.id;
+  auditEntity.auditState = AuditState.Assigned;
+  auditEntity.assignTimestamp = event.block.timestamp;
 
-export function handleLogAuditAssignmentError_ExceededMaxAssignedRequests(
-  event: LogAuditAssignmentError_ExceededMaxAssignedRequests
-): void {}
+  auditEntity.save();
+}
 
-export function handleLogAuditAssignmentError_Understaked(
-  event: LogAuditAssignmentError_Understaked
-): void {}
+export function handleLogAuditFinished(event: LogAuditFinished): void {
+  let auditEntity = Audit.load(event.params.requestId.toHex());
+  let reportEntity = new Report(event.params.requestId.toHex());
 
-export function handleLogAuditAssignmentUpdate_Expired(
-  event: LogAuditAssignmentUpdate_Expired
-): void {}
+  reportEntity.reportText = event.params.report;
+  reportEntity.contract = auditEntity.contract;
+  reportEntity.auditor = event.params.auditor.toHex();
+  
+  auditEntity.auditState = event.params.auditResult;
+  auditEntity.reportTimestamp = event.block.timestamp;
+
+  auditEntity.save();
+  reportEntity.save();
+}
+
+export function handleLogPoliceAuditFinished(event: LogPoliceAuditFinished): void {
+  let policeNodeEntity = PoliceNode.load(event.params.policeNode.toHex());
+
+  if(policeNodeEntity == null) {
+    policeNodeEntity = new PoliceNode(event.params.policeNode.toHex());
+    policeNodeEntity.save();
+  }
+
+  let auditEntity = Audit.load(event.params.requestId.toHex());
+
+  auditEntity.isVerified = event.params.isVerified;
+  auditEntity.policeAuditor = policeNodeEntity.id;
+  auditEntity.policeReport = event.params.report;
+
+  auditEntity.save();
+}
+
+export function handleLogReportSubmissionError_InvalidAuditor(event: LogReportSubmissionError_InvalidAuditor): void {
+  let entity = new LogReportSubmissionError_InvalidAuditorEntity(event.transaction.hash.toHex());
+
+  entity.txHash = event.transaction.hash;
+  entity.block = event.block.hash;
+  entity.timestamp = event.block.timestamp;
+  entity.invalidAuditor = event.params.auditor;
+  entity.requestId = event.params.requestId;
+
+  entity.save();
+}
+
+export function handleLogReportSubmissionError_InvalidState(event: LogReportSubmissionError_InvalidState): void {
+  let entity = new LogReportSubmissionError_InvalidStateEntity(event.transaction.hash.toHex());
+
+  entity.txHash = event.transaction.hash;
+  entity.block = event.block.hash;
+  entity.timestamp = event.block.timestamp;
+  entity.auditor = event.params.auditor;
+  entity.requestId = event.params.requestId;
+  entity.invalidState = event.params.state;
+
+  entity.save();
+}
+
+export function handleLogReportSubmissionError_InvalidResult(event: LogReportSubmissionError_InvalidResult): void {
+  let entity = new LogReportSubmissionError_InvalidResultEntity(event.transaction.hash.toHex());
+
+  entity.txHash = event.transaction.hash;
+  entity.block = event.block.hash;
+  entity.timestamp = event.block.timestamp;
+  entity.auditor = event.params.auditor;
+  entity.requestId = event.params.requestId;
+  entity.invalidState = event.params.state;
+
+  entity.save();
+}
+
+export function handleLogReportSubmissionError_ExpiredAudit(event: LogReportSubmissionError_ExpiredAudit): void {
+  let entity = new LogReportSubmissionError_ExpiredAuditEntity(event.transaction.hash.toHex());
+
+  entity.txHash = event.transaction.hash;
+  entity.block = event.block.hash;
+  entity.blockNumber = event.block.number;
+  entity.timestamp = event.block.timestamp;
+  entity.auditor = event.params.auditor;
+  entity.requestId = event.params.requestId;
+  entity.allowanceBlockNumber = event.params.allowanceBlockNumber;
+
+  entity.save();
+}
+
+export function handleLogAuditAssignmentError_ExceededMaxAssignedRequests(event: LogAuditAssignmentError_ExceededMaxAssignedRequests): void {
+}
+
+export function handleLogAuditAssignmentError_Understaked(event: LogAuditAssignmentError_Understaked): void {
+  let entity = new LogAuditAssignmentError_UnderstakedEntity(event.transaction.hash.toHex());
+
+  entity.txHash = event.transaction.hash;
+  entity.block = event.block.hash;
+  entity.timestamp = event.block.timestamp;
+  entity.auditor = event.params.auditor;
+  entity.invalidStake = event.params.stake;
+
+  entity.save();
+}
+
+export function handleLogAuditAssignmentUpdate_Expired(event: LogAuditAssignmentUpdate_Expired): void {
+  let entity = new LogAuditAssignmentUpdate_ExpiredEntity(event.transaction.hash.toHex());
+
+  entity.txHash = event.transaction.hash;
+  entity.block = event.block.hash;
+  entity.blockNumber = event.block.number;
+  entity.timestamp = event.block.timestamp;
+  entity.requestId = event.params.requestId;
+  entity.allowanceBlockNumber = event.params.allowanceBlockNumber;
+
+  entity.save();
+}
 
 export function handleLogClaimRewardsReachedGasLimit(
   event: LogClaimRewardsReachedGasLimit
@@ -146,25 +205,86 @@ export function handleLogClaimRewardsReachedGasLimit(
 
 export function handleLogAuditQueueIsEmpty(event: LogAuditQueueIsEmpty): void {}
 
-export function handleLogPayAuditor(event: LogPayAuditor): void {}
+export function handleLogPayAuditor(event: LogPayAuditor): void {
+  let auditEntity = Audit.load(event.params.requestId.toHex());
+  let auditNodeEntity = AuditNode.load(auditEntity.auditor);
+  let policeNodeEntity = PoliceNode.load(auditEntity.policeAuditor);
 
-export function handleLogAuditNodePriceChanged(
-  event: LogAuditNodePriceChanged
-): void {}
+  if(policeNodeEntity == null) {
+    policeNodeEntity = new PoliceNode(auditEntity.policeAuditor);
+  }
 
-export function handleLogRefund(event: LogRefund): void {}
+  auditNodeEntity.feeCollected = auditNodeEntity.feeCollected.plus(event.params.amount);
 
-export function handleLogRefundInvalidRequestor(
-  event: LogRefundInvalidRequestor
-): void {}
+  let policeFee = auditEntity.price.minus(event.params.amount);
+  policeNodeEntity.feeCollected = policeNodeEntity.feeCollected.plus(policeFee);
 
-export function handleLogRefundInvalidState(
-  event: LogRefundInvalidState
-): void {}
+  auditNodeEntity.save();
+  policeNodeEntity.save();
+}
 
-export function handleLogRefundInvalidFundsLocked(
-  event: LogRefundInvalidFundsLocked
-): void {}
+export function handleLogAuditNodePriceChanged(event: LogAuditNodePriceChanged): void {
+  let auditNodeEntity = AuditNode.load(event.params.auditor.toHex());
+
+  if(auditNodeEntity == null) {
+    auditNodeEntity = new AuditNode(event.params.auditor.toHex());
+  }
+
+  auditNodeEntity.price = event.params.amount;
+
+  auditNodeEntity.save();
+}
+
+export function handleLogRefund(event: LogRefund): void {
+  let refundEntity = new Refund(event.params.requestId.toHex());
+
+  refundEntity.requestor = event.params.requestor;
+  refundEntity.price = event.params.amount;
+
+  refundEntity.save();
+}
+
+export function handleLogRefundInvalidRequestor(event: LogRefundInvalidRequestor): void {
+  let entity = new LogRefund_InvalidRequestor(event.transaction.hash.toHex());
+
+  entity.txHash = event.transaction.hash;
+  entity.block = event.block.hash;
+  entity.timestamp = event.block.timestamp;
+  entity.requestId = event.params.requestId;
+  entity.invalidRequestor = event.params.requestor;
+
+  entity.save();
+}
+
+export function handleLogRefundInvalidState(event: LogRefundInvalidState): void {
+  let auditEntity = Audit.load(event.params.requestId.toHex());
+  let errorEntity = new LogRefund_InvalidState(event.transaction.hash.toHex());
+  
+  auditEntity.auditState = event.params.state;
+
+  errorEntity.txHash = event.transaction.hash;
+  errorEntity.block = event.block.hash;
+  errorEntity.timestamp = event.block.timestamp;
+  errorEntity.requestId = event.params.requestId;
+  errorEntity.invalidState = event.params.state;
+
+  auditEntity.save();
+  errorEntity.save();
+}
+
+export function handleLogRefundInvalidFundsLocked(event: LogRefundInvalidFundsLocked): void {
+  let entity = new LogRefund_InvalidFundsLocked(event.transaction.hash.toHex());
+
+  entity.txHash = event.transaction.hash;
+  entity.block = event.block.hash;
+  entity.blockNumber = event.block.number;
+  entity.timestamp = event.block.timestamp;
+  entity.requestId = event.params.requestId;
+  entity.currentBlock = event.params.currentBlock;
+  entity.fundLockEndBlock = event.params.fundLockEndBlock;
+
+  entity.save();
+}
 
 export function handleLogAuditNodePriceHigherThanRequests(
   event: LogAuditNodePriceHigherThanRequests

@@ -1,6 +1,142 @@
-type ExampleEntity @entity {
+type Audit @entity {
   id: ID!
-  count: BigInt!
-  requestId: BigInt! # uint256
-  auditor: Bytes! # address
+  auditState: Int   # Audit State enum value
+  requestor: Bytes
+  price: BigInt
+  contract: SmartContract
+  isVerified: Boolean
+  auditor: AuditNode
+  policeAuditor: PoliceNode
+  report: Report
+  policeReport: Bytes
+  requestTimestamp: BigInt
+  assignTimestamp: BigInt
+  reportTimestamp: BigInt
+}
+
+type Report @entity {
+  id: ID!
+  auditor: AuditNode
+  reportText: Bytes
+  contract: SmartContract
+}
+
+type Vulnerability @entity {
+  id: ID!
+}
+
+type SmartContract @entity {
+  id: ID! # string uri
+  vulnerabilites: [Vulnerability!]
+}
+
+type AuditNode @entity {
+  id: ID!
+  price: BigInt
+  feeCollected: BigInt
+}
+
+type PoliceNode @entity {
+  id: ID!
+  feeCollected: BigInt
+}
+
+type Refund @entity {
+  id: ID!
+  requestor: Bytes
+  price: BigInt
+}
+
+# Report Submission errors
+
+type LogReportSubmissionError_InvalidAuditorEntity @entity {
+  id: ID!
+  txHash: Bytes
+  block: Bytes
+  timestamp: BigInt
+  invalidAuditor: Bytes
+  requestId: BigInt
+}
+
+type LogReportSubmissionError_InvalidStateEntity @entity {
+  id: ID!
+  txHash: Bytes
+  block: Bytes
+  timestamp: BigInt
+  auditor: Bytes
+  requestId: BigInt
+  invalidState: Int  # Audit State enum value
+}
+
+type LogReportSubmissionError_InvalidResultEntity @entity {
+  id: ID!
+  txHash: Bytes
+  block: Bytes
+  timestamp: BigInt
+  auditor: Bytes
+  requestId: BigInt
+  invalidState: Int  # Audit State enum value
+}
+
+type LogReportSubmissionError_ExpiredAuditEntity @entity {
+  id: ID!
+  txHash: Bytes
+  block: Bytes
+  blockNumber: BigInt
+  timestamp: BigInt
+  auditor: Bytes
+  requestId: BigInt
+  allowanceBlockNumber: BigInt
+}
+
+# Audit Assignment errors
+
+type LogAuditAssignmentError_UnderstakedEntity @entity {
+  id: ID!
+  txHash: Bytes
+  block: Bytes
+  timestamp: BigInt
+  auditor: Bytes
+  invalidStake: BigInt
+}
+
+type LogAuditAssignmentUpdate_ExpiredEntity @entity {
+  id: ID!
+  txHash: Bytes
+  block: Bytes
+  blockNumber: BigInt
+  timestamp: BigInt
+  requestId: BigInt
+  allowanceBlockNumber: BigInt
+}
+
+# Log Refund errors
+
+type LogRefund_InvalidRequestor @entity {
+  id: ID!
+  txHash: Bytes
+  block: Bytes
+  timestamp: BigInt
+  requestId: BigInt
+  invalidRequestor: Bytes
+}
+
+type LogRefund_InvalidState @entity {
+  id: ID!
+  txHash: Bytes
+  block: Bytes
+  timestamp: BigInt
+  requestId: BigInt
+  invalidState: Int # Audit State enum value
+}
+
+type LogRefund_InvalidFundsLocked @entity {
+  id: ID!
+  txHash: Bytes
+  block: Bytes
+  blockNumber: BigInt
+  timestamp: BigInt
+  requestId: BigInt 
+  currentBlock: BigInt
+  fundLockEndBlock: BigInt
 }
